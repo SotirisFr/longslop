@@ -1,0 +1,7 @@
+anthropic>=2.3
+pydantic>=2.8
+requests>=2.32
+feedparser>=6.0
+trafilatura>=1.12
+google-api-python-client>=2.140
+google-auth-oauthlib>=1.2
