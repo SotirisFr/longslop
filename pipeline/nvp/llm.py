@@ -1,29 +1,24 @@
-"""Thin wrapper around the Claude API for JSON-shaped pipeline steps."""
+"""JSON-shaped pipeline steps run through the Claude Code CLI (`claude -p`), so they use your Claude login, not an API key."""
 
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import tempfile
 from typing import TypeVar
 
-import anthropic
 from pydantic import BaseModel
 
-MODEL = "claude-opus-5-5"
+from . import config
+
+MODEL = config.env("CLAUDE_MODEL", "opus")
 
 T = TypeVar("T", bound=BaseModel)
 
-_client: anthropic.Anthropic | None = None
-
-
-def client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic()
-    return _client
-
 
 def _strict(schema: dict) -> dict:
-    """Structured outputs want every object closed and every property required."""
+    """Close every object and require every property, so the output always matches the pydantic model."""
     if isinstance(schema, dict):
         if schema.get("type") == "object" and "properties" in schema:
             schema["additionalProperties"] = False
@@ -36,23 +31,31 @@ def _strict(schema: dict) -> dict:
     return schema
 
 
-def ask_json(model_cls: type[T], system: str, prompt: str, effort: str = "high", max_tokens: int = 64000) -> T:
-    """One request, validated into `model_cls`. Streams so long scripts never hit HTTP timeouts."""
-    schema = _strict(model_cls.model_json_schema())
-    with client().beta.messages.stream(
-        model=MODEL,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
-        # A safety-classifier decline is retried on a fallback model instead of failing the run.
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    ) as stream:
-        msg = stream.get_final_message()
-    if msg.stop_reason == "refusal":
-        raise RuntimeError(f"Claude declined this step: {msg.stop_details}")
-    if msg.stop_reason == "max_tokens":
-        raise RuntimeError("Output hit max_tokens; raise the limit or shorten the input")
-    text = next(b.text for b in msg.content if b.type == "text")
-    return model_cls.model_validate(json.loads(text))
+def ask_json(model_cls: type[T], system: str, prompt: str, effort: str = "high", timeout: int = 1800) -> T:
+    """One headless Claude run with no tools, validated into `model_cls`."""
+    exe = shutil.which("claude")
+    if not exe:
+        raise SystemExit("The `claude` CLI is not installed or not on PATH. Install Claude Code and run `claude` once to sign in.")
+    schema = json.dumps(_strict(model_cls.model_json_schema()), ensure_ascii=False)
+    cmd = [
+        exe, "-p",
+        "--model", MODEL,
+        "--effort", effort,
+        "--system-prompt", system,
+        "--json-schema", schema,
+        "--output-format", "json",
+        "--tools", "",
+        "--no-session-persistence",
+    ]
+    # Run from an empty directory so no project CLAUDE.md or settings leak into the prompt.
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=cwd, timeout=timeout)
+    if proc.returncode != 0:
+        raise RuntimeError(f"claude exited with {proc.returncode}: {proc.stderr.strip()[:2000]}")
+    out = json.loads(proc.stdout)
+    if out.get("is_error") or out.get("subtype") != "success":
+        raise RuntimeError(f"claude run failed: {out.get('subtype')} {str(out.get('result'))[:2000]}")
+    data = out.get("structured_output")
+    if data is None:
+        data = json.loads(out["result"])
+    return model_cls.model_validate(data)

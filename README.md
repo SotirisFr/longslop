@@ -13,18 +13,18 @@ scout ─▶ you pick ─▶ sources ─▶ script + fact-check ─▶ YOU APPRO
 
 | Step | Module | Service |
 | --- | --- | --- |
-| Story pitches from Greek RSS | `pipeline/nvp/scout.py` | Claude |
+| Story pitches from Greek RSS | `pipeline/nvp/scout.py` | Claude Code CLI |
 | Articles, lead photos, outlet credits | `pipeline/nvp/sources.py` | Google News RSS, trafilatura |
-| Script (~1,500 words) and fact-check against sources | `pipeline/nvp/script.py` | Claude |
+| Script (~1,500 words) and fact-check against sources | `pipeline/nvp/script.py` | Claude Code CLI |
 | Voice with per-character timestamps | `pipeline/nvp/voice.py` | ElevenLabs |
-| One visual per sentence | `pipeline/nvp/beats.py` | Claude |
+| One visual per sentence | `pipeline/nvp/beats.py` | Claude Code CLI |
 | Stock clips and press photos | `pipeline/nvp/footage.py` | Magnific (free stock downloads only, capped per day), Pexels, Pixabay |
 | Video and thumbnails | `pipeline/nvp/render.py` + `video/` | Remotion, OpenAI images (optional) |
 | Private upload, publish, phone notifications | `pipeline/nvp/publish.py` | YouTube Data API, Telegram |
 
 ## Setup
 
-1. Node 20+, Python 3.11+, ffmpeg.
+1. Node 20+, Python 3.11+, ffmpeg, and [Claude Code](https://code.claude.com) signed in (`claude` on PATH). The Claude steps run through `claude -p`, so they use your Claude plan instead of an API key.
 2. `cd video && npm install`
 3. `pip install -r pipeline/requirements.txt`
 4. `cp .env.example .env` and fill in the keys.
