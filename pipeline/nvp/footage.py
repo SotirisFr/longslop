@@ -30,15 +30,15 @@ def _magnific(query: str) -> str | None:
     Endpoint paths follow the Freepik/Magnific stock API; confirm them against docs.magnific.com on first run.
     Any limit, payment or credit response disables Magnific for the rest of the day and we fall back to Pexels.
     """
-    key = config.env("MAGNIFIC_API_KEY")
-    if not key:
+    key = config.env("MAGNIFIC_API_KEY")  # may instead be injected by a network-secret proxy
+    if not key and not config.env("MAGNIFIC_VIA_PROXY"):
         return None
     ledger_path, ledger = _magnific_ledger()
     today = dt.date.today().isoformat()
     used = ledger.get(today, 0)
     if used >= MAGNIFIC_DAILY_CAP or ledger.get(f"{today}:stopped"):
         return None
-    headers = {"x-magnific-api-key": key, "x-freepik-api-key": key, "Accept-Language": "en-US"}
+    headers = {"Accept-Language": "en-US", **({"x-magnific-api-key": key, "x-freepik-api-key": key} if key else {})}
     r = requests.get(f"{MAGNIFIC_API}/videos", headers=headers, params={"term": query, "order": "relevance", "limit": 5}, timeout=30)
     if not r.ok:
         return None
@@ -62,10 +62,10 @@ def _magnific(query: str) -> str | None:
 
 
 def _pexels(query: str) -> str | None:
-    key = config.env("PEXELS_API_KEY")
-    if not key:
+    key = config.env("PEXELS_API_KEY")  # may instead be injected by a network-secret proxy
+    if not key and not config.env("PEXELS_VIA_PROXY"):
         return None
-    r = requests.get("https://api.pexels.com/videos/search", headers={"Authorization": key},
+    r = requests.get("https://api.pexels.com/videos/search", headers={"Authorization": key} if key else {},
                      params={"query": query, "orientation": "landscape", "per_page": 5}, timeout=30)
     if not r.ok:
         return None

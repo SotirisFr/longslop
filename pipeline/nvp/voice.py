@@ -27,7 +27,8 @@ def _pronounce(text: str) -> str:
 
 def synthesize(script: Script, run_dir: Path) -> list[dict]:
     """Returns one {section, index, text, start, end} per sentence, in seconds on the final voice track."""
-    key = config.env("ELEVENLABS_API_KEY", required=True)
+    # The key can come from the environment, or be injected by a network-secret proxy (cloud sessions).
+    key = config.env("ELEVENLABS_API_KEY")
     voice = config.env("ELEVENLABS_VOICE_ID", "n0vzWypeCK1NlWPVwhOc")  # channel voice chosen by Sotiris
     parts, timings, offset = [], [], 0.0
     for si, sec in enumerate(script.sections):
@@ -35,7 +36,7 @@ def synthesize(script: Script, run_dir: Path) -> list[dict]:
         text = " ".join(spoken)
         r = requests.post(
             API.format(voice=voice),
-            headers={"xi-api-key": key},
+            headers={"xi-api-key": key} if key else {},
             json={
                 "text": text,
                 "model_id": config.ELEVENLABS_MODEL,
