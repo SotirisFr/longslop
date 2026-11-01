@@ -28,7 +28,7 @@ def _pronounce(text: str) -> str:
 def synthesize(script: Script, run_dir: Path) -> list[dict]:
     """Returns one {section, index, text, start, end} per sentence, in seconds on the final voice track."""
     key = config.env("ELEVENLABS_API_KEY", required=True)
-    voice = config.env("ELEVENLABS_VOICE_ID", required=True)
+    voice = config.env("ELEVENLABS_VOICE_ID", "n0vzWypeCK1NlWPVwhOc")  # channel voice chosen by Sotiris
     parts, timings, offset = [], [], 0.0
     for si, sec in enumerate(script.sections):
         spoken = [_pronounce(s) for s in sec.sentences]
