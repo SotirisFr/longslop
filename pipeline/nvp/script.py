@@ -58,9 +58,18 @@ def _sources_block(pack: dict) -> str:
     return "\n\n".join(f"<source id={a['id']} outlet={a['outlet']}>\n{a['text']}\n</source>" for a in pack["articles"])
 
 
-def write(pack: dict, run_dir: Path) -> tuple[Script, FactCheck]:
+def write(pack: dict, run_dir: Path, title: str | None = None, brief: str | None = None) -> tuple[Script, FactCheck]:
+    """`brief` replaces the default crime-story structure (e.g. for a political series); `title` is kept verbatim."""
     src = _sources_block(pack)
-    script = ask_json(Script, SYSTEM, f"Sources:\n{src}\n\nWrite the video script.", effort="high")
+    system = SYSTEM
+    if brief:
+        system = SYSTEM.split("Structure, as sections:")[0] + brief + "\nRules:" + SYSTEM.split("Rules:", 1)[1]
+    ask = "Write the video script."
+    if title:
+        ask += f" The YouTube title is fixed: {title}"
+    script = ask_json(Script, system, f"Sources:\n{src}\n\n{ask}", effort="high")
+    if title:
+        script.title = title
     flat = "\n".join(s for sec in script.sections for s in sec.sentences)
     check = ask_json(FactCheck, CHECK, f"Sources:\n{src}\n\nScript:\n{flat}", effort="high")
     (run_dir / "script.json").write_text(script.model_dump_json(indent=2))

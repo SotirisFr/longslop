@@ -29,7 +29,7 @@ def build(urls: list[str], query: str, run_dir: Path, max_articles: int = 10) ->
     photos = run_dir / "photos"
     photos.mkdir(exist_ok=True)
     seen, articles = set(), []
-    for url in list(dict.fromkeys(urls + google_news(query))):
+    for url in list(dict.fromkeys(urls + (google_news(query) if query else []))):
         if len(articles) >= max_articles:
             break
         try:

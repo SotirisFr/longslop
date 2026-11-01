@@ -40,7 +40,9 @@ def cmd_scout(_: argparse.Namespace) -> None:
 
 
 def cmd_make(a: argparse.Namespace) -> str:
-    if a.url:
+    if a.sources:
+        urls, query, title = [], "", a.slug or "story"
+    elif a.url:
         urls, query, title = a.url, a.query or "", a.query or "story"
     else:
         p = json.loads((config.RUNS_DIR / "pitches.json").read_text())["pitches"][a.pitch - 1]
@@ -48,8 +50,15 @@ def cmd_make(a: argparse.Namespace) -> str:
     slug = re.sub(r"[^\w]+", "-", title.lower()).strip("-")[:40]
     run_id = f"{dt.date.today():%Y%m%d}-{slug}"
     rd = _run_dir(run_id)
-    pack = sources.build(urls, query, rd)
-    s, check = script.write(pack, rd)
+    if a.sources:
+        # A hand-made source pack (same shape as sources.json), for when article sites can't be fetched.
+        rd.mkdir(parents=True, exist_ok=True)
+        pack = json.loads(Path(a.sources).read_text())
+        (rd / "sources.json").write_text(json.dumps(pack, ensure_ascii=False, indent=2))
+    else:
+        pack = sources.build(urls, query, rd)
+    brief = Path(a.brief).read_text() if a.brief else None
+    s, check = script.write(pack, rd, title=a.title, brief=brief)
     flagged = sum(not c.supported for c in check.claims)
     _state(run_id, step="script_ready", flagged=flagged)
     publish.notify(
@@ -115,6 +124,10 @@ def main() -> None:
     m.add_argument("pitch", type=int, nargs="?", default=1)
     m.add_argument("--url", action="append")
     m.add_argument("--query")
+    m.add_argument("--title", help="fixed YouTube title")
+    m.add_argument("--brief", help="file with a custom section structure for the script")
+    m.add_argument("--sources", help="ready-made sources.json instead of fetching articles")
+    m.add_argument("--slug", help="run name when using --sources")
     m.set_defaults(fn=cmd_make)
     ap_ = sub.add_parser("approve")
     ap_.add_argument("run_id")
